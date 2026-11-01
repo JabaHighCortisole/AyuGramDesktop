@@ -27,12 +27,13 @@ struct WindowPosition;
 enum class QuitReason;
 } // namespace Core
 
+class QWidget;
+class QTimer;
+
 namespace Window {
 
 class Controller;
 class SessionController;
-class QWidget;
-class QTimer;
 class TitleWidget;
 struct TermsLock;
 struct SeparateId;
