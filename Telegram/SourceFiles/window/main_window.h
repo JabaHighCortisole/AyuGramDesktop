@@ -31,6 +31,8 @@ namespace Window {
 
 class Controller;
 class SessionController;
+class QWidget;
+class QTimer;
 class TitleWidget;
 struct TermsLock;
 struct SeparateId;
@@ -227,6 +229,8 @@ private:
 	bool _maximizedBeforeHide = false;
 
 	QPoint _lastMyChildCreatePosition;
+	QWidget *_ayuScheduleOverlay = nullptr;
+	QTimer *_ayuScheduleTimer = nullptr;
 	int _lastChildIndex = 0;
 
 	mutable QRect _monitorRect;
