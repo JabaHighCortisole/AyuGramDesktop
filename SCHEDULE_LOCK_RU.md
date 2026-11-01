@@ -30,3 +30,36 @@
 ## Состояние реализации
 
 Код добавлен в feature-ветку как начальная интеграция. Сборка APK/EXE и проверка на реальных устройствах ещё не выполнены. Перед выпуском нужно прогнать тесты границ расписания, собрать оба проекта и проверить сценарии сна/возврата, смены даты, смены системного часового пояса и изменения времени.
+
+
+## Подготовка сборки Windows Desktop
+
+Сборка нужна для проверки именно этой feature-ветки, а не для публикации релиза.
+
+### Что потребуется на компьютере
+
+- Windows 11 x64 и свободное место на диске под исходники, библиотеки и build output (лучше подготовить не менее 100 ГБ свободного места).
+- Visual Studio с C++ desktop workload. Официальная инструкция ветки AyuGram сейчас указывает Visual Studio 2026, Windows 11 SDK 10.0.26100.0, MSVC v143 14.44, MFC и ATL x86/x64. Перед установкой сверить актуальную инструкцию upstream: [building-win.md](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win.md).
+- Python 3.10 и Git.
+- 64 ГБ RAM достаточно для комфортной подготовки и Debug-сборки, но фактические требования зависят от библиотек и параллелизма.
+- Telegram Desktop API credentials. В официальной инструкции AyuGram Desktop приведены публичные Telegram API ID/hash для локальной сборки (API ID 2040). Не использовать их как секрет безопасности; при необходимости можно указать собственные credentials.
+
+### Команды из официальной инструкции
+
+Команды выполняются в Visual Studio x64 Native Tools terminal, настроенном на MSVC 14.44. Не запускать Release для первичной проверки; предпочтителен Debug.
+
+```bat
+git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
+tdesktop\Telegram\build\prepare\win.bat
+cd tdesktop\Telegram
+configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+```
+
+Затем открыть `tdesktop\out\Telegram.slnx` в Visual Studio и собрать проект Telegram в Debug. Ожидаемый исполняемый файл: `tdesktop\out\Debug\Telegram.exe`.
+
+### Важно для текущей разработки
+
+- В этой ветке расписание блокировки уже добавлено в исходники, но **компиляция пока не подтверждена**.
+- Сначала требуется Debug-сборка, запуск и проверка окна блокировки по границам расписания.
+- Официальная инструкция upstream и агентские заметки в репозитории могут расходиться по версии Visual Studio. Перед установкой ориентироваться на актуальную [инструкцию сборки](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win.md).
+- Этот файл не означает, что сборка или тестирование уже выполнены.
