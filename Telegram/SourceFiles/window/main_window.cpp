@@ -54,9 +54,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #endif // Q_OS_MAC
 
 #include <QtCore/QMimeData>
+#include <QtCore/QDateTime>
+#include <QtCore/QTimeZone>
+#include <QtCore/QTimer>
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
 #include <QtGui/QDrag>
+#include <QtWidgets/QLabel>
+#include <QtWidgets/QVBoxLayout>
+#include <QtWidgets/QWidget>
 
 #include <kurlmimedata.h>
 
@@ -70,6 +76,17 @@ namespace {
 constexpr auto kSaveWindowPositionTimeout = crl::time(1000);
 
 using Core::WindowPosition;
+
+
+[[nodiscard]] bool AyuScheduleAllowsAccess() {
+	const auto now = QDateTime::currentDateTime(
+		QTimeZone(QByteArray("Europe/Moscow")));
+	const auto day = now.date().dayOfWeek(); // Monday = 1, Sunday = 7.
+	const auto minute = now.time().hour() * 60 + now.time().minute();
+	const auto evening = (day >= 1 && day <= 6 && minute >= 950);
+	const auto overnight = (day >= 2 && day <= 7 && minute < 120);
+	return evening || overnight;
+}
 
 [[nodiscard]] QRect ScreenAvailableGeometry(not_null<const QWidget*> widget) {
 	// When the last monitor is removed Qt keeps delivering resize events
@@ -567,6 +584,50 @@ QRect MainWindow::desktopRect() const {
 void MainWindow::init() {
 	initHook();
 
+	_ayuScheduleOverlay = new QWidget(this);
+	_ayuScheduleOverlay->setObjectName("ayuScheduleLockOverlay");
+	_ayuScheduleOverlay->setStyleSheet(
+		"#ayuScheduleLockOverlay { background: #0f121a; }"
+		"QLabel { color: #ffffff; }");
+	_ayuScheduleOverlay->setFocusPolicy(Qt::StrongFocus);
+	auto layout = new QVBoxLayout(_ayuScheduleOverlay);
+	layout->setContentsMargins(36, 36, 36, 36);
+	layout->setAlignment(Qt::AlignCenter);
+	auto title = new QLabel(
+		QString::fromUtf8("Доступ временно закрыт"), _ayuScheduleOverlay);
+	title->setAlignment(Qt::AlignCenter);
+	title->setStyleSheet("font-size: 26px; font-weight: 600;");
+	auto details = new QLabel(
+		QString::fromUtf8(
+			"AyuGram доступен с понедельника по субботу, "
+			"с 15:50 до 02:00 по московскому времени."),
+		_ayuScheduleOverlay);
+	details->setAlignment(Qt::AlignCenter);
+	details->setWordWrap(true);
+	details->setStyleSheet("font-size: 16px; color: #cdd3e0;");
+	layout->addWidget(title);
+	layout->addSpacing(16);
+	layout->addWidget(details);
+	_ayuScheduleTimer = new QTimer(this);
+	connect(_ayuScheduleTimer, &QTimer::timeout, this, [=] {
+		if (!_ayuScheduleOverlay) {
+			return;
+		}
+		_ayuScheduleOverlay->setGeometry(rect());
+		const auto allowed = AyuScheduleAllowsAccess();
+		_ayuScheduleOverlay->setVisible(!allowed);
+		if (!allowed) {
+			_ayuScheduleOverlay->raise();
+			_ayuScheduleOverlay->setFocus(Qt::OtherFocusReason);
+		}
+	});
+	_ayuScheduleTimer->start(1000);
+	_ayuScheduleOverlay->setGeometry(rect());
+	_ayuScheduleOverlay->setVisible(!AyuScheduleAllowsAccess());
+	if (_ayuScheduleOverlay->isVisible()) {
+		_ayuScheduleOverlay->raise();
+	}
+
 	updatePalette();
 
 	if (Ui::Platform::NativeWindowFrameSupported()) {
@@ -623,6 +684,9 @@ void MainWindow::handleVisibleChanged(bool visible) {
 	}
 
 	handleVisibleChangedHook(visible);
+	if (visible && _ayuScheduleTimer) {
+		_ayuScheduleTimer->start(1000);
+	}
 }
 
 void MainWindow::showFromTray() {
@@ -642,6 +706,13 @@ void MainWindow::activate() {
 	bool wasHidden = !isVisible();
 	setWindowState(windowState() & ~Qt::WindowMinimized);
 	setVisible(true);
+	if (_ayuScheduleOverlay) {
+		_ayuScheduleOverlay->setGeometry(rect());
+		_ayuScheduleOverlay->setVisible(!AyuScheduleAllowsAccess());
+		if (_ayuScheduleOverlay->isVisible()) {
+			_ayuScheduleOverlay->raise();
+		}
+	}
 	Platform::ActivateThisProcess();
 	raise();
 	activateWindow();
